@@ -1,17 +1,32 @@
-import streamlit as st
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain_community.llms.ollama import Ollama
+import time
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_community.llms import Ollama
+import os
+from dotenv import load_dotenv
+import streamlit as st
 
+
+# Prompt Template
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", """
+            You are a helpful assistant. 
+            Always respond directly and concisely to user queries. 
+            Do not include introductory or concluding remarks such as 
+            "Sure, I can help!" or "Let me know if you need anything else."
+        """),
+        ("user", "Question:{question}")
+    ]
+)
+
+# Initialize LLM
 llm = Ollama(model="llama2")
-
-prompt_template = PromptTemplate(input_variables=["question"], template="{question}")
 output_parser = StrOutputParser()
-chain = LLMChain(llm=llm, prompt=prompt_template, output_key="response")
+chain = prompt | llm | output_parser
 
-st.title('LangChain Chatbot with LLAMA2')
-
+# Streamlit
+st.title('Langchain With LLAMA2 API')
 if "history" not in st.session_state:
     st.session_state["history"] = []
 
@@ -28,7 +43,21 @@ with st.form(key="chat_form", clear_on_submit=True):
 
 if submitted and user_input:
     with st.spinner("Waiting for the model's response..."):
-        response = chain({"question": user_input})["response"]
-        st.session_state["history"].append({"user": user_input, "llm": response})
+        st.session_state["history"].append({"user": user_input, "llm": ""})
+        placeholder = st.empty()
+        response_parts = []
 
-    st.experimental_rerun()
+        conversation_history = "\n".join(
+            f"User: {entry['user']}\nLLM: {entry['llm']}"
+            for entry in st.session_state["history"][:-1]
+        )
+        enriched_question = f"Context:\n{conversation_history}\nQuestion: {user_input}"
+
+        for chunk in chain.stream({"question": enriched_question}):
+            response_parts.append(chunk)
+            placeholder.markdown(f"**LLM:** {''.join(response_parts)}")
+            time.sleep(0.1)
+
+        full_response = ''.join(response_parts)
+        st.session_state["history"][-1]["llm"] = full_response
+        display_conversation(st.session_state["history"])
