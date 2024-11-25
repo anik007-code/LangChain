@@ -1,4 +1,6 @@
 import time
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.llms import Ollama
@@ -6,6 +8,11 @@ import os
 from dotenv import load_dotenv
 import streamlit as st
 
+load_dotenv()
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
+
+app = FastAPI(title="Langchain Demo with LLAMA2 API")
 
 # Prompt Template
 prompt = ChatPromptTemplate.from_messages(
@@ -61,3 +68,22 @@ if submitted and user_input:
         full_response = ''.join(response_parts)
         st.session_state["history"][-1]["llm"] = full_response
         display_conversation(st.session_state["history"])
+
+
+
+# Fast api
+# class QueryRequest(BaseModel):
+#     question: str
+#
+# @app.post("/query/")
+# def get_response(request: QueryRequest):
+#     question = request.question
+#     if not question:
+#         raise HTTPException(status_code=400, detail="Question cannot be empty.")
+#
+#     try:
+#         # Invoke the chain and get the response
+#         response = chain.invoke({"question": question})
+#         return {"question": question, "response": response}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error processing the query: {str(e)}")
